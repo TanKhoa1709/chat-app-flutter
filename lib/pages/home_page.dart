@@ -1,8 +1,15 @@
 import 'package:chat_app_flutter/components/my_drawer.dart';
+import 'package:chat_app_flutter/components/user_tile.dart';
+import 'package:chat_app_flutter/pages/chat_page.dart';
+import 'package:chat_app_flutter/services/auth/auth_service.dart';
+import 'package:chat_app_flutter/services/chat/chat_service.dart';
 import 'package:flutter/material.dart';
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  HomePage({super.key});
+
+  final ChatService _chatService = ChatService();
+  final AuthService _authService = AuthService();
 
   @override
   Widget build(BuildContext context) {
@@ -11,6 +18,50 @@ class HomePage extends StatelessWidget {
         title: Text('Home'),
       ),
       drawer: MyDrawer(),
+      body: _buildUserList(),
+    );
+  }
+
+  // List of users
+  Widget _buildUserList() {
+    return StreamBuilder(
+      stream: _chatService.getUsersStream(),
+      builder: (context, snapshot) {
+        // Error
+        if (snapshot.hasError) {
+          return Text('Error: ${snapshot.error}');
+        }
+
+        // Loading
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        // List view
+        return ListView(
+          children: snapshot.data!
+              .map<Widget>((userData) => _buildUserListItem(userData, context))
+              .toList(),
+        );
+      },
+    );
+  }
+
+  // Individual list tile for user
+  Widget _buildUserListItem(
+      Map<String, dynamic> userData, BuildContext context) {
+    return UserTile(
+      text: userData['email'],
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ChatPage(receiverEmail: userData['email']),
+          ),
+        );
+      },
     );
   }
 }

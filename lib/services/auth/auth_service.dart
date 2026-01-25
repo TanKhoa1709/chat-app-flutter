@@ -6,6 +6,11 @@ class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  // Get current user
+  User? getCurrentUser() {
+    return _auth.currentUser;
+  }
+
   // Sign in
   Future<UserCredential> signInWithEmailAndPassword(
     String email,
@@ -22,7 +27,8 @@ class AuthService {
       _firestore.collection('Users').doc(userCredential.user!.uid).set({
         'uid': userCredential.user!.uid,
         'email': email,
-      });
+        'last_login': DateTime.now(),
+      }, SetOptions(merge: true));
 
       return userCredential;
     } on FirebaseAuthException catch (e) {
@@ -56,6 +62,7 @@ class AuthService {
       _firestore.collection('Users').doc(userCredential.user!.uid).set({
         'uid': userCredential.user!.uid,
         'email': email,
+        'last_login': DateTime.now(),
       });
 
       return userCredential;

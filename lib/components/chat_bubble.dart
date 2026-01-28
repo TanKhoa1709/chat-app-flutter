@@ -36,7 +36,10 @@ class ChatBubble extends StatelessWidget {
                 title: Text('Block'),
                 onTap: () {
                   Navigator.pop(context);
+                  Navigator.pop(context);
                   _blockUser(context, userID);
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text('User Blocked!')));
                 },
               ),
               ListTile(

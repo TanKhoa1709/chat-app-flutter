@@ -154,6 +154,8 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           ChatBubble(
             message: messageData['message'],
             isCurrentUser: isCurrentUser,
+            messageID: doc.id,
+            userID: messageData['sender_id'],
           ),
         ],
       ),

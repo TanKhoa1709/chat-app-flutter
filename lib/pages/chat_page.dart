@@ -145,21 +145,47 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     var alignment =
         isCurrentUser ? Alignment.centerRight : Alignment.centerLeft;
 
-    return Container(
-      alignment: alignment,
-      child: Column(
-        crossAxisAlignment:
-            isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-        children: [
-          ChatBubble(
-            message: messageData['message'],
-            isCurrentUser: isCurrentUser,
-            messageID: doc.id,
-            userID: messageData['sender_id'],
-          ),
-        ],
-      ),
-    );
+    String type = messageData['type'] ?? 'text';
+
+    if (type == 'call') {
+      return Container(
+        alignment: alignment,
+        child: Column(
+          crossAxisAlignment:
+              isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.call),
+                SizedBox(width: 10),
+                ChatBubble(
+                  message: messageData['message'],
+                  isCurrentUser: isCurrentUser,
+                  messageID: doc.id,
+                  userID: messageData['sender_id'],
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    } else {
+      return Container(
+        alignment: alignment,
+        child: Column(
+          crossAxisAlignment:
+              isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            ChatBubble(
+              message: messageData['message'],
+              isCurrentUser: isCurrentUser,
+              messageID: doc.id,
+              userID: messageData['sender_id'],
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   // User input

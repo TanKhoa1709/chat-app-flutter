@@ -51,6 +51,7 @@ class ChatService extends ChangeNotifier {
       receiverID: receiverID,
       message: message,
       timestamp: timestamp,
+      type: 'text',
     );
 
     // Construct chat room ID (sorted to ensure uniqueness)
@@ -59,6 +60,36 @@ class ChatService extends ChangeNotifier {
     String chatRoomID = ids.join('_');
 
     // Save message to firestore
+    await _firestore
+        .collection('chat_rooms')
+        .doc(chatRoomID)
+        .collection('messages')
+        .add(messageObj.toMap());
+  }
+
+  // Send call log
+  Future<void> sendCallLog(String receiverID, String message) async {
+    // Get current user info
+    final String currentUserID = _auth.currentUser!.uid;
+    final String currentUserEmail = _auth.currentUser!.email!;
+    final Timestamp timestamp = Timestamp.now();
+
+    // Create message
+    final Message messageObj = Message(
+      senderID: currentUserID,
+      senderEmail: currentUserEmail,
+      receiverID: receiverID,
+      message: message,
+      timestamp: timestamp,
+      type: 'call',
+    );
+
+    // Construct chat room ID (sorted to ensure uniqueness)
+    List<String> ids = [currentUserID, receiverID];
+    ids.sort(); // Sort the list of IDs to ensure the chatRoomID is the same for any 2 users
+    String chatRoomID = ids.join('_');
+
+    // Save call log to firestore
     await _firestore
         .collection('chat_rooms')
         .doc(chatRoomID)

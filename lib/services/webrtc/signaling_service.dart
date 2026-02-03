@@ -45,9 +45,9 @@ class SignalingService {
   }
 
   // 2. Tạo phòng gọi (Dành cho Người Gọi - Caller)
-  Future<String> createRoom(RTCVideoRenderer remoteRenderer) async {
+  Future<String> createRoom(String roomId, RTCVideoRenderer remoteRenderer) async {
     DocumentReference roomRef =
-        db.collection('calls').doc(); // Tạo ID ngẫu nhiên
+        db.collection('calls').doc(roomId);
 
     debugPrint('Create PeerConnection with configuration: $configuration');
 
@@ -120,7 +120,7 @@ class SignalingService {
       }
     });
 
-    return roomId!;
+    return roomId;
   }
 
   // 3. Vào phòng gọi (Dành cho Người Nghe - Callee)

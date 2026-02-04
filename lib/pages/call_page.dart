@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:chat_app_flutter/services/auth/auth_service.dart';
 import 'package:chat_app_flutter/services/chat/chat_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -27,6 +30,7 @@ class _CallPageState extends State<CallPage> {
   final _localRenderer = RTCVideoRenderer();
   final _remoteRenderer = RTCVideoRenderer();
   String? _roomId;
+  StreamSubscription? _roomStreamSubscription;
 
   // Khai báo SignalingService
   final SignalingService _signaling = SignalingService();
@@ -86,11 +90,17 @@ class _CallPageState extends State<CallPage> {
       await _signaling.joinRoom(widget.roomId, _remoteRenderer);
     }
 
+    if (_roomId != null) {
+      _listenForRemoteHangup();
+    }
+
     setState(() {});
   }
 
   @override
   void dispose() {
+    // Hủy lắng nghe Firebase để tránh lỗi khi thoát màn hình
+    _roomStreamSubscription?.cancel();
     // Dọn dẹp khi thoát màn hình
     _localRenderer.dispose();
     _remoteRenderer.dispose();
@@ -98,6 +108,32 @@ class _CallPageState extends State<CallPage> {
       _signaling.hangUp(_localRenderer, _roomId!);
     }
     super.dispose();
+  }
+
+  void _listenForRemoteHangup() {
+    if (_roomId == null) return;
+
+    // Bắt đầu theo dõi document phòng gọi
+    _roomStreamSubscription = FirebaseFirestore.instance
+        .collection('calls')
+        .doc(_roomId)
+        .snapshots()
+        .listen((snapshot) {
+      // Logic: Nếu snapshot không tồn tại (nghĩa là document đã bị xóa)
+      if (!snapshot.exists) {
+        debugPrint("ALARM: Phòng đã bị xóa -> Đối phương đã cúp máy.");
+
+        // Kiểm tra xem màn hình còn đang mở không để đóng lại
+        if (mounted) {
+          Navigator.pop(context);
+
+          // Hiện thông báo
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Cuộc gọi đã kết thúc")),
+          );
+        }
+      }
+    });
   }
 
   // Hàm bật/tắt Mic

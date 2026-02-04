@@ -2,6 +2,7 @@ import 'package:chat_app_flutter/services/auth/auth_service.dart';
 import 'package:chat_app_flutter/services/chat/chat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../services/webrtc/signaling_service.dart';
 
@@ -43,6 +44,18 @@ class _CallPageState extends State<CallPage> {
   }
 
   Future<void> initRenderers() async {
+    // Xin quyền Camera/Mic
+    await [Permission.camera, Permission.microphone].request();
+
+    // Kiểm tra xem user đã đồng ý chưa
+    var camStatus = await Permission.camera.status;
+    var micStatus = await Permission.microphone.status;
+
+    if (!camStatus.isGranted || !micStatus.isGranted) {
+      debugPrint("Người dùng từ chối quyền Camera/Mic!");
+      return; // Dừng luôn, không chạy tiếp để tránh lỗi
+    }
+
     // 1. Bật 2 cái Tivi lên
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();

@@ -1,6 +1,7 @@
 import 'package:chat_app_flutter/components/my_button.dart';
 import 'package:chat_app_flutter/components/my_textfield.dart';
 import 'package:chat_app_flutter/services/auth/auth_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class LoginPage extends StatelessWidget {
@@ -11,25 +12,77 @@ class LoginPage extends StatelessWidget {
 
   LoginPage({super.key, required this.changeToRegisterPage});
 
-  void login(BuildContext context) {
+  void login(BuildContext context) async {
     // Auth service
     final AuthService authService = AuthService();
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      showErrorDialog(context, "Vui lòng nhập đầy đủ Email và Mật khẩu!");
+      return;
+    }
+
     // Login
     try {
-      authService.signInWithEmailAndPassword(
+      await authService.signInWithEmailAndPassword(
         _emailController.text,
         _passwordController.text,
       );
+    } on FirebaseAuthException catch (e) {
+      String message = "";
+
+      // Kiểm tra mã lỗi (Error Code) để thông báo tiếng Việt
+      switch (e.code) {
+        case 'user-not-found':
+          message = "Tài khoản email này không tồn tại.";
+          break;
+        case 'wrong-password':
+          message = "Mật khẩu không chính xác.";
+          break;
+        case 'invalid-credential':
+          message = "Email hoặc mật khẩu không đúng.";
+          break;
+        case 'invalid-email':
+          message = "Định dạng email không hợp lệ.";
+          break;
+        case 'too-many-requests':
+          message = "Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau.";
+          break;
+        default:
+          message = "Lỗi đăng nhập: ${e.message}";
+      }
+
+      if (context.mounted) {
+        showErrorDialog(context, message);
+      }
     } catch (e) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('Error'),
-          content: Text(e.toString()),
-        ),
-      );
+      // Bắt các lỗi khác không phải của Firebase
+      if (context.mounted) {
+        showErrorDialog(context, "Đã xảy ra lỗi: $e");
+      }
     }
+  }
+
+  // Hàm tiện ích để hiện hộp thoại báo lỗi
+  void showErrorDialog(BuildContext context, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          "Đăng nhập thất bại",
+          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+        ),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Đóng"),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

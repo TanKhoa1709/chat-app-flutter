@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 class AuthService {
   // Instance of auth and firestore
@@ -16,24 +17,24 @@ class AuthService {
     String email,
     String password,
   ) async {
-    try {
-      // Sign in
-      UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+    // Sign in
+    UserCredential userCredential = await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
 
-      // Save user info if not already saved
-      _firestore.collection('Users').doc(userCredential.user!.uid).set({
+    // Save user info if not already saved
+    try {
+      await _firestore.collection('Users').doc(userCredential.user!.uid).set({
         'uid': userCredential.user!.uid,
         'email': email,
         'last_login': DateTime.now(),
       }, SetOptions(merge: true));
-
-      return userCredential;
-    } on FirebaseAuthException catch (e) {
-      throw Exception(e.code);
+    } catch (e) {
+      debugPrint("Lỗi lưu user vào Firestore: $e");
     }
+
+    return userCredential;
   }
 
   // Sign out

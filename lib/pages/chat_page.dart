@@ -1,5 +1,6 @@
 import 'package:chat_app_flutter/components/chat_bubble.dart';
 import 'package:chat_app_flutter/components/my_textfield.dart';
+import 'package:chat_app_flutter/pages/call_page.dart';
 import 'package:chat_app_flutter/services/auth/auth_service.dart';
 import 'package:chat_app_flutter/services/chat/chat_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -86,6 +87,42 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
     scrollDown();
   }
 
+  void _callUser() async {
+    // 1. Lấy ID của 2 người để tạo Room ID
+    String currentUserID = _authService.getCurrentUser()!.uid;
+    String receiverID = widget.receiverID;
+
+    // 2. Tạo Chat Room ID
+    List<String> ids = [currentUserID, receiverID];
+    ids.sort(); // Sắp xếp để luôn giống nhau: "A_B"
+    String chatRoomID = ids.join('_');
+
+    // 3. Kiểm tra xem phòng gọi đã tồn tại chưa?
+    // Logic: Nếu có phòng rồi -> Mình là người nghe (Join). Chưa có -> Mình là người gọi (Create).
+    var roomSnapshot = await FirebaseFirestore.instance
+        .collection('calls')
+        .doc(chatRoomID)
+        .get();
+
+    // Kiểm tra ngay sau khi await xong:
+    // "Nếu màn hình này đã bị đóng (mounted == false) thì dừng lại, không làm gì nữa."
+    if (!mounted) return;
+
+    bool isCaller = !roomSnapshot.exists;
+
+    // 4. Chuyển sang màn hình gọi
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CallPage(
+          roomId: chatRoomID,
+          receiverID: receiverID,
+          isCaller: isCaller, // Tự động xác định vai trò
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -95,6 +132,12 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.grey,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.videocam, size: 28),
+            onPressed: _callUser,
+          ),
+        ],
       ),
       body: Column(
         children: [

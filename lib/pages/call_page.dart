@@ -26,7 +26,7 @@ class _CallPageState extends State<CallPage> {
   // 1. Khai báo 2 cái "Tivi" (Renderer)
   final _localRenderer = RTCVideoRenderer();
   final _remoteRenderer = RTCVideoRenderer();
-  String? roomId;
+  String? _roomId;
 
   // Khai báo SignalingService
   final SignalingService _signaling = SignalingService();
@@ -39,7 +39,7 @@ class _CallPageState extends State<CallPage> {
   void initState() {
     super.initState();
     // Khởi tạo ngay khi mở màn hình
-    roomId = widget.roomId;
+    _roomId = widget.roomId;
     initRenderers();
   }
 
@@ -78,7 +78,9 @@ class _CallPageState extends State<CallPage> {
     if (widget.isCaller) {
       // Nếu là người gọi -> Tạo phòng
       // Dùng roomId truyền vào để set vào Firestore
-      await _signaling.createRoom(_remoteRenderer, widget.receiverID, senderId, senderName);
+      _roomId = await _signaling.createRoom(
+          _remoteRenderer, widget.receiverID, senderId, senderName);
+      setState(() {});
     } else {
       // Nếu là người nghe -> Vào phòng
       await _signaling.joinRoom(widget.roomId, _remoteRenderer);
@@ -92,8 +94,8 @@ class _CallPageState extends State<CallPage> {
     // Dọn dẹp khi thoát màn hình
     _localRenderer.dispose();
     _remoteRenderer.dispose();
-    if (roomId != null) {
-      _signaling.hangUp(_localRenderer, roomId!);
+    if (_roomId != null) {
+      _signaling.hangUp(_localRenderer, _roomId!);
     }
     super.dispose();
   }
@@ -125,11 +127,16 @@ class _CallPageState extends State<CallPage> {
       );
     }
     // 2. Dọn dẹp Signaling
-    if (roomId != null) {
-      _signaling.hangUp(_localRenderer, roomId!);
+    if (_roomId == null) {
+      debugPrint("LỖI: _roomId bị NULL -> Không thể xóa!");
+    } else if (_roomId!.isEmpty) {
+      debugPrint("LỖI: _roomId bị RỖNG -> Không thể xóa!");
+    } else {
+      debugPrint("ID hợp lệ. Đang gọi lệnh xóa cho phòng: $_roomId");
+      _signaling.hangUp(_localRenderer, _roomId!);
     }
     // 3. Thoát màn hình
-    Navigator.pop(context);
+    if (mounted) Navigator.pop(context);
   }
 
   @override

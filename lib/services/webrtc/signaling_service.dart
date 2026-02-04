@@ -202,17 +202,37 @@ class SignalingService {
 
   // 4. Kết thúc cuộc gọi
   Future<void> hangUp(RTCVideoRenderer localRenderer, String roomId) async {
-    // 1. Dừng renderer
-    localRenderer.srcObject?.getTracks().forEach((track) => track.stop());
-    localRenderer.srcObject = null;
-
-    // 2. Xóa phòng trên Firestore
-    if (roomId.isNotEmpty) {
-      db.collection('calls').doc(roomId).delete();
+    // 1. Dừng Camera/Mic
+    if (localRenderer.srcObject != null) {
+      localRenderer.srcObject!.getTracks().forEach((track) => track.stop());
+      localRenderer.srcObject = null;
     }
 
-    localStream!.dispose();
-    remoteStream?.dispose();
+    if (roomId.isEmpty) return;
+
+    var db = FirebaseFirestore.instance;
+    var roomRef = db.collection('calls').doc(roomId);
+
+    try {
+      // 2. Xóa các Sub-collections (Candidates)
+      // Cần xóa từng document bên trong sub-collection
+      var callerCandidates = await roomRef.collection('callerCandidates').get();
+      for (var doc in callerCandidates.docs) {
+        await doc.reference.delete();
+      }
+
+      var calleeCandidates = await roomRef.collection('calleeCandidates').get();
+      for (var doc in calleeCandidates.docs) {
+        await doc.reference.delete();
+      }
+
+      // 3. Cuối cùng xóa Document cha
+      await roomRef.delete();
+
+      debugPrint("Đã xóa phòng gọi");
+    } catch (e) {
+      debugPrint("Lỗi khi dọn dẹp phòng: $e");
+    }
   }
 
   // Hàm phụ trợ để log trạng thái

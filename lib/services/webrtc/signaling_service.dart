@@ -45,9 +45,13 @@ class SignalingService {
   }
 
   // 2. Tạo phòng gọi (Dành cho Người Gọi - Caller)
-  Future<String> createRoom(String roomId, RTCVideoRenderer remoteRenderer) async {
-    DocumentReference roomRef =
-        db.collection('calls').doc(roomId);
+  Future<String> createRoom(
+    RTCVideoRenderer remoteRenderer,
+    String receiverId,
+    String senderId,
+    String senderName,
+  ) async {
+    DocumentReference roomRef = db.collection('calls').doc();
 
     debugPrint('Create PeerConnection with configuration: $configuration');
 
@@ -73,7 +77,13 @@ class SignalingService {
     debugPrint('Created offer: $offer');
 
     // Gửi lời mời lên Firestore
-    Map<String, dynamic> roomWithOffer = {'offer': offer.toMap()};
+    Map<String, dynamic> roomWithOffer = {
+      'offer': offer.toMap(),
+      'receiverId': receiverId,
+      'senderId': senderId,
+      'senderName': senderName,
+      'timestamp': FieldValue.serverTimestamp(),
+    };
     await roomRef.set(roomWithOffer);
 
     // Gán ID phòng để sau này xóa
@@ -120,7 +130,7 @@ class SignalingService {
       }
     });
 
-    return roomId;
+    return roomId!;
   }
 
   // 3. Vào phòng gọi (Dành cho Người Nghe - Callee)
@@ -191,33 +201,14 @@ class SignalingService {
   }
 
   // 4. Kết thúc cuộc gọi
-  Future<void> hangUp(RTCVideoRenderer localVideo) async {
-    List<MediaStreamTrack> tracks = localVideo.srcObject!.getTracks();
-    for (var track in tracks) {
-      track.stop();
-    }
+  Future<void> hangUp(RTCVideoRenderer localRenderer, String roomId) async {
+    // 1. Dừng renderer
+    localRenderer.srcObject?.getTracks().forEach((track) => track.stop());
+    localRenderer.srcObject = null;
 
-    if (remoteStream != null) {
-      remoteStream!.getTracks().forEach((track) => track.stop());
-    }
-
-    if (peerConnection != null) peerConnection!.close();
-
-    if (roomId != null) {
-      var roomRef = db.collection('calls').doc(roomId);
-
-      // Xóa các candidate (Optional: clean up data)
-      var calleeCandidates = await roomRef.collection('calleeCandidates').get();
-      for (var document in calleeCandidates.docs) {
-        document.reference.delete();
-      }
-
-      var callerCandidates = await roomRef.collection('callerCandidates').get();
-      for (var document in callerCandidates.docs) {
-        document.reference.delete();
-      }
-
-      await roomRef.delete();
+    // 2. Xóa phòng trên Firestore
+    if (roomId.isNotEmpty) {
+      db.collection('calls').doc(roomId).delete();
     }
 
     localStream!.dispose();

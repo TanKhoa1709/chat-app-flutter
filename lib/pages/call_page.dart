@@ -1,3 +1,4 @@
+import 'package:chat_app_flutter/services/auth/auth_service.dart';
 import 'package:chat_app_flutter/services/chat/chat_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
@@ -24,6 +25,7 @@ class _CallPageState extends State<CallPage> {
   // 1. Khai báo 2 cái "Tivi" (Renderer)
   final _localRenderer = RTCVideoRenderer();
   final _remoteRenderer = RTCVideoRenderer();
+  String? roomId;
 
   // Khai báo SignalingService
   final SignalingService _signaling = SignalingService();
@@ -36,6 +38,7 @@ class _CallPageState extends State<CallPage> {
   void initState() {
     super.initState();
     // Khởi tạo ngay khi mở màn hình
+    roomId = widget.roomId;
     initRenderers();
   }
 
@@ -44,11 +47,15 @@ class _CallPageState extends State<CallPage> {
     await _localRenderer.initialize();
     await _remoteRenderer.initialize();
 
+    // Lấy thông tin người dùng hiện tại
+    final user = AuthService().getCurrentUser();
+    String senderId = user!.uid;
+    String senderName = user.email!;
+
     // 2. Gắn sự kiện: Khi có luồng video mới từ bên kia -> Cập nhật giao diện
     _signaling.onAddRemoteStream = ((stream) {
-      setState(() {
-        _remoteRenderer.srcObject = stream;
-      });
+      _remoteRenderer.srcObject = stream;
+      setState(() {});
     });
 
     // 3. Mở Camera & Mic của mình trước
@@ -58,7 +65,7 @@ class _CallPageState extends State<CallPage> {
     if (widget.isCaller) {
       // Nếu là người gọi -> Tạo phòng
       // Dùng roomId truyền vào để set vào Firestore
-      await _signaling.createRoom(widget.roomId, _remoteRenderer);
+      await _signaling.createRoom(_remoteRenderer, widget.receiverID, senderId, senderName);
     } else {
       // Nếu là người nghe -> Vào phòng
       await _signaling.joinRoom(widget.roomId, _remoteRenderer);
@@ -72,7 +79,9 @@ class _CallPageState extends State<CallPage> {
     // Dọn dẹp khi thoát màn hình
     _localRenderer.dispose();
     _remoteRenderer.dispose();
-    _signaling.hangUp(_localRenderer);
+    if (roomId != null) {
+      _signaling.hangUp(_localRenderer, roomId!);
+    }
     super.dispose();
   }
 
@@ -92,6 +101,22 @@ class _CallPageState extends State<CallPage> {
       track.enabled = !_isCameraOn;
     });
     setState(() => _isCameraOn = !_isCameraOn);
+  }
+
+  void _hangUp() async {
+    // 1. Chỉ người gọi (Caller) mới lưu log
+    if (widget.isCaller) {
+      ChatService().sendCallLog(
+        widget.receiverID, // ID người nhận
+        "Cuộc gọi video", // Nội dung hiển thị
+      );
+    }
+    // 2. Dọn dẹp Signaling
+    if (roomId != null) {
+      _signaling.hangUp(_localRenderer, roomId!);
+    }
+    // 3. Thoát màn hình
+    Navigator.pop(context);
   }
 
   @override
@@ -155,19 +180,7 @@ class _CallPageState extends State<CallPage> {
 
                 // Nút Cúp máy
                 IconButton(
-                  onPressed: () async {
-                    // 1. Chỉ người gọi (Caller) mới lưu log
-                    if (widget.isCaller) {
-                      ChatService().sendCallLog(
-                        widget.receiverID, // ID người nhận
-                        "Cuộc gọi video", // Nội dung hiển thị
-                      );
-                    }
-                    // 2. Dọn dẹp Signaling
-                    _signaling.hangUp(_localRenderer);
-                    // 3. Thoát màn hình
-                    Navigator.pop(context);
-                  },
+                  onPressed: () => _hangUp(),
                   style: IconButton.styleFrom(
                     backgroundColor: Colors.red,
                     padding: const EdgeInsets.all(16),

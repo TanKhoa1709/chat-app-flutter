@@ -88,67 +88,19 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   void _callUser() async {
-    // 1. Lấy ID của 2 người để tạo Room ID
-    String currentUserID = _authService.getCurrentUser()!.uid;
-    String receiverID = widget.receiverID;
-
-    // 2. Tạo Chat Room ID
-    List<String> ids = [currentUserID, receiverID];
-    ids.sort(); // Sắp xếp để luôn giống nhau: "A_B"
-    String chatRoomID = ids.join('_');
-
-    // 3. Kiểm tra xem phòng gọi đã tồn tại chưa?
-    // Logic: Nếu có phòng rồi -> Mình là người nghe (Join). Chưa có -> Mình là người gọi (Create).
-    var roomSnapshot = await FirebaseFirestore.instance
-        .collection('calls')
-        .doc(chatRoomID)
-        .get();
-
-    // Kiểm tra ngay sau khi await xong:
-    // "Nếu màn hình này đã bị đóng (mounted == false) thì dừng lại, không làm gì nữa."
-    if (!mounted) return;
-
-    bool isCaller = !roomSnapshot.exists;
-
-    // 4. Chuyển sang màn hình gọi
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => CallPage(
-          roomId: chatRoomID,
-          receiverID: receiverID,
-          isCaller: isCaller, // Tự động xác định vai trò
+          // Truyền chuỗi rỗng vì CallPage sẽ tự sinh ID mới trong initRenderers
+          roomId: "",
+
+          // ID người mình muốn gọi (để gửi thông báo cho họ)
+          receiverID: widget.receiverID,
+
+          // KHẲNG ĐỊNH: Tôi là người gọi
+          isCaller: true,
         ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      appBar: AppBar(
-        title: Text(widget.receiverEmail),
-        backgroundColor: Colors.transparent,
-        foregroundColor: Colors.grey,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.videocam, size: 28),
-            onPressed: _callUser,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // List of messages
-          Expanded(
-            child: _buildMessageList(),
-          ),
-
-          // User input
-          _buildUserInput(),
-        ],
       ),
     );
   }
@@ -258,6 +210,36 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: AppBar(
+        title: Text(widget.receiverEmail),
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.grey,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.videocam, size: 28),
+            onPressed: _callUser,
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // List of messages
+          Expanded(
+            child: _buildMessageList(),
+          ),
+
+          // User input
+          _buildUserInput(),
         ],
       ),
     );

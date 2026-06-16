@@ -26,6 +26,7 @@ class SignalingService {
   String? roomId;
   String? currentRoomText;
   StreamStateCallback? onAddRemoteStream;
+  Function(RTCPeerConnectionState)? onConnectionStateChange;
 
   FirebaseFirestore db = FirebaseFirestore.instance;
 
@@ -99,9 +100,14 @@ class SignalingService {
 
     // Lắng nghe Phản hồi (Answer) từ người nghe
     roomRef.snapshots().listen((snapshot) async {
+      if (!snapshot.exists || snapshot.data() == null) {
+        debugPrint("Phòng đã bị xóa hoặc dữ liệu trống.");
+        return;
+      }
       debugPrint('Got updated room: ${snapshot.data()}');
       Map<String, dynamic> data = snapshot.data() as Map<String, dynamic>;
-      if (peerConnection?.getRemoteDescription() != null &&
+      if (peerConnection != null &&
+          peerConnection?.getRemoteDescription() != null &&
           data['answer'] != null) {
         var answer = RTCSessionDescription(
           data['answer']['sdp'],
@@ -208,13 +214,31 @@ class SignalingService {
       localRenderer.srcObject = null;
     }
 
+    // 2. Đóng PeerConnection và giải phóng tài nguyên WebRTC
+    try {
+      if (peerConnection != null) {
+        await peerConnection!.close();
+        peerConnection = null;
+      }
+      if (localStream != null) {
+        await localStream!.dispose();
+        localStream = null;
+      }
+      if (remoteStream != null) {
+        await remoteStream!.dispose();
+        remoteStream = null;
+      }
+    } catch (e) {
+      debugPrint("Lỗi giải phóng tài nguyên WebRTC: $e");
+    }
+
     if (roomId.isEmpty) return;
 
     var db = FirebaseFirestore.instance;
     var roomRef = db.collection('calls').doc(roomId);
 
     try {
-      // 2. Xóa các Sub-collections (Candidates)
+      // 3. Xóa các Sub-collections (Candidates)
       // Cần xóa từng document bên trong sub-collection
       var callerCandidates = await roomRef.collection('callerCandidates').get();
       for (var doc in callerCandidates.docs) {
@@ -226,7 +250,7 @@ class SignalingService {
         await doc.reference.delete();
       }
 
-      // 3. Cuối cùng xóa Document cha
+      // 4. Cuối cùng xóa Document cha
       await roomRef.delete();
 
       debugPrint("Đã xóa phòng gọi");
@@ -243,6 +267,7 @@ class SignalingService {
 
     peerConnection?.onConnectionState = (RTCPeerConnectionState state) {
       debugPrint('Connection state change: $state');
+      onConnectionStateChange?.call(state);
     };
 
     peerConnection?.onSignalingState = (RTCSignalingState state) {

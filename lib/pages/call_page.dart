@@ -38,6 +38,7 @@ class _CallPageState extends State<CallPage> {
   // Trạng thái Mic/Cam
   bool _isMicOn = true;
   bool _isCameraOn = true;
+  bool _isExiting = false;
 
   @override
   void initState() {
@@ -75,6 +76,19 @@ class _CallPageState extends State<CallPage> {
       setState(() {});
     });
 
+    // Lắng nghe trạng thái kết nối WebRTC để tự động thoát màn hình khi ngắt kết nối
+    _signaling.onConnectionStateChange = (state) {
+      debugPrint("WebRTC Connection State changed inside Page: $state");
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateDisconnected ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
+          state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) {
+        debugPrint("WebRTC đứt kết nối hoặc đóng -> Thoát cuộc gọi.");
+        if (mounted && !_isExiting) {
+          _hangUp();
+        }
+      }
+    };
+
     // 3. Mở Camera & Mic của mình trước
     await _signaling.openUserMedia(_localRenderer, _remoteRenderer);
 
@@ -99,6 +113,7 @@ class _CallPageState extends State<CallPage> {
 
   @override
   void dispose() {
+    _isExiting = true;
     // Hủy lắng nghe Firebase để tránh lỗi khi thoát màn hình
     _roomStreamSubscription?.cancel();
     // Dọn dẹp khi thoát màn hình
@@ -124,7 +139,9 @@ class _CallPageState extends State<CallPage> {
         debugPrint("ALARM: Phòng đã bị xóa -> Đối phương đã cúp máy.");
 
         // Kiểm tra xem màn hình còn đang mở không để đóng lại
-        if (mounted) {
+        if (mounted && !_isExiting) {
+          _isExiting = true;
+          _roomStreamSubscription?.cancel();
           Navigator.pop(context);
 
           // Hiện thông báo
@@ -155,6 +172,10 @@ class _CallPageState extends State<CallPage> {
   }
 
   void _hangUp() async {
+    if (_isExiting) return;
+    _isExiting = true;
+    _roomStreamSubscription?.cancel();
+
     // 1. Chỉ người gọi (Caller) mới lưu log
     if (widget.isCaller) {
       ChatService().sendCallLog(

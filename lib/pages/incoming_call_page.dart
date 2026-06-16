@@ -1,8 +1,9 @@
+import 'dart:async';
 import 'package:chat_app_flutter/pages/call_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-class IncomingCallPage extends StatelessWidget {
+class IncomingCallPage extends StatefulWidget {
   final String callId; // ID của phòng gọi
   final String callerId; // ID người gọi
   final String callerName; // Tên người gọi
@@ -14,28 +15,92 @@ class IncomingCallPage extends StatelessWidget {
     required this.callerName,
   });
 
-  void _declineCall(BuildContext context) async {
-    // 1. Xóa phòng gọi trên Firestore
-    await FirebaseFirestore.instance.collection('calls').doc(callId).delete();
-    // 2. Đóng màn hình này
-    if (context.mounted) Navigator.pop(context);
+  @override
+  State<IncomingCallPage> createState() => _IncomingCallPageState();
+}
+
+class _IncomingCallPageState extends State<IncomingCallPage> {
+  StreamSubscription? _callStreamSubscription;
+  bool _isExiting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToCallCancellation();
   }
 
-  void _acceptCall(BuildContext context) async {
-    // 1. Đóng màn hình chờ
-    Navigator.pop(context);
+  @override
+  void dispose() {
+    _callStreamSubscription?.cancel();
+    super.dispose();
+  }
 
-    // 2. Chuyển sang màn hình gọi
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CallPage(
-          roomId: callId,
-          receiverID: callerId,
-          isCaller: false,
+  void _listenToCallCancellation() {
+    _callStreamSubscription = FirebaseFirestore.instance
+        .collection('calls')
+        .doc(widget.callId)
+        .snapshots()
+        .listen((snapshot) {
+      // Nếu cuộc gọi không còn tồn tại trên Firestore -> Người gọi đã hủy
+      if (!snapshot.exists) {
+        debugPrint("Người gọi đã hủy cuộc gọi.");
+        _exitPage(message: "Cuộc gọi đã bị hủy");
+      }
+    });
+  }
+
+  void _exitPage({String? message}) {
+    if (_isExiting) return;
+    _isExiting = true;
+    _callStreamSubscription?.cancel();
+    
+    if (mounted) {
+      Navigator.pop(context);
+      if (message != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+    }
+  }
+
+  void _declineCall() async {
+    if (_isExiting) return;
+    _isExiting = true;
+    _callStreamSubscription?.cancel();
+
+    // 1. Xóa phòng gọi trên Firestore
+    try {
+      await FirebaseFirestore.instance.collection('calls').doc(widget.callId).delete();
+    } catch (e) {
+      debugPrint("Lỗi khi từ chối cuộc gọi: $e");
+    }
+
+    // 2. Đóng màn hình này
+    if (mounted) Navigator.pop(context);
+  }
+
+  void _acceptCall() {
+    if (_isExiting) return;
+    _isExiting = true;
+    _callStreamSubscription?.cancel();
+
+    // 1. Đóng màn hình chờ
+    if (mounted) {
+      Navigator.pop(context);
+
+      // 2. Chuyển sang màn hình gọi
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CallPage(
+            roomId: widget.callId,
+            receiverID: widget.callerId,
+            isCaller: false,
+          ),
         ),
-      ),
-    );
+      );
+    }
   }
 
   @override
@@ -56,7 +121,7 @@ class IncomingCallPage extends StatelessWidget {
             const SizedBox(height: 20),
             // Tên người gọi
             Text(
-              "$callerName đang gọi...",
+              "${widget.callerName} đang gọi...",
               style: const TextStyle(
                 fontSize: 28,
                 color: Colors.white,
@@ -78,7 +143,7 @@ class IncomingCallPage extends StatelessWidget {
                     FloatingActionButton(
                       heroTag: "decline",
                       backgroundColor: Colors.redAccent,
-                      onPressed: () => _declineCall(context),
+                      onPressed: _declineCall,
                       child: const Icon(Icons.call_end, color: Colors.white),
                     ),
                     const SizedBox(height: 8),
@@ -93,7 +158,7 @@ class IncomingCallPage extends StatelessWidget {
                     FloatingActionButton(
                       heroTag: "accept",
                       backgroundColor: Colors.green,
-                      onPressed: () => _acceptCall(context),
+                      onPressed: _acceptCall,
                       child: const Icon(Icons.call, color: Colors.white),
                     ),
                     const SizedBox(height: 8),

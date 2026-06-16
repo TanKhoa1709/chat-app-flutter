@@ -47,7 +47,7 @@ class SettingPage extends StatelessWidget {
                       onChanged: (value) =>
                           Provider.of<ThemeProvider>(context, listen: false)
                               .toggleTheme(),
-                      activeColor: Colors.green,
+                      activeThumbColor: Colors.green,
                     ),
                   ],
                 ),

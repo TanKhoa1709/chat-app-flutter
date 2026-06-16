@@ -34,6 +34,9 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   // Text field focus node
   FocusNode focusNode = FocusNode();
 
+  // Track the number of messages to auto scroll on new message
+  int _messageCount = 0;
+
   @override
   void initState() {
     super.initState();
@@ -70,11 +73,13 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
   }
 
   void scrollDown() {
-    _scrollController.animateTo(
-      _scrollController.position.maxScrollExtent,
-      duration: Duration(seconds: 1),
-      curve: Curves.fastOutSlowIn,
-    );
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
   }
 
   // Send message
@@ -121,10 +126,22 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
           );
         }
 
+        final docs = snapshot.data!.docs;
+
+        // Auto scroll to bottom if new messages arrive
+        if (docs.length > _messageCount) {
+          _messageCount = docs.length;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            scrollDown();
+          });
+        } else {
+          _messageCount = docs.length;
+        }
+
         return ListView(
           controller: _scrollController,
           children:
-              snapshot.data!.docs.map((doc) => _buildMessageItem(doc)).toList(),
+              docs.map((doc) => _buildMessageItem(doc)).toList(),
         );
       },
     );
@@ -150,15 +167,23 @@ class _ChatPageState extends State<ChatPage> with WidgetsBindingObserver {
               isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment:
+                  isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
               children: [
-                Icon(Icons.call),
-                SizedBox(width: 10),
+                if (!isCurrentUser) ...[
+                  const Icon(Icons.call),
+                  const SizedBox(width: 10),
+                ],
                 ChatBubble(
                   message: messageData['message'],
                   isCurrentUser: isCurrentUser,
                   messageID: doc.id,
                   userID: messageData['sender_id'],
                 ),
+                if (isCurrentUser) ...[
+                  const SizedBox(width: 10),
+                  const Icon(Icons.call),
+                ],
               ],
             ),
           ],
